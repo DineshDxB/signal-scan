@@ -32,7 +32,7 @@ jobs:
 
       - name: Build
         env:
-          VITE_SUPABASE_URL:      ${{ https://tdaqkrgvhrivomvbjral.supabase.co }}
+          VITE_SUPABASE_URL:      https://tdaqkrgvhrivomvbjral.supabase.co
           VITE_SUPABASE_ANON_KEY: ${{ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkYXFrcmd2aHJpdm9tdmJqcmFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTIwNzYsImV4cCI6MjA4OTc2ODA3Nn0.wQh0s2R5ZCItz8bEuTXW0GRTyKUVIUcRpKULCPQYDG4 }}
          
         run: npm run build
