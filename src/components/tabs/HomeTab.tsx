@@ -16,18 +16,18 @@ interface HomeTabProps {
   strategyChanges: Array<{ param: string; from: number | string; to: number | string; reason: string }>
   openCount: number
   capital: number
+  signalCount: number
   trades: Array<{ coin: string; outcome: string; entryType: string; pnl?: number }>
 }
 
 export default function HomeTab({
   dayNumber, totalPnl, winRate, wins, closedCount, pf,
   avgWin, avgLoss, equityCurve, strategyVersion, strategyChanges,
-  openCount, capital, trades
+  openCount, capital, signalCount, trades
 }: HomeTabProps) {
   const pnlCol = totalPnl >= 0 ? '#00ff88' : '#ff3355'
   const closed = trades.filter(t => t.outcome !== 'OPEN')
 
-  // Win rate by coin
   const coins = ['SOL', 'BTC', 'ETH', 'LINK', 'BNB', 'XRP', 'AVAX', 'DOT']
   const coinStats = coins.map(coin => {
     const ct = closed.filter(t => t.coin === coin)
@@ -36,7 +36,6 @@ export default function HomeTab({
     return { coin, wr, trades: ct.length, wins: cw }
   }).filter(s => s.trades > 0)
 
-  // Win rate by entry type
   const entryTypes = ['FVG', 'PULLBACK', 'BREAKOUT']
   const entryStats = entryTypes.map(et => {
     const et_t = closed.filter(t => t.entryType === et)
@@ -48,7 +47,7 @@ export default function HomeTab({
 
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* Day banner + equity */}
+      {/* Day banner */}
       <div style={{ padding: 16, borderRadius: 12, background: 'linear-gradient(135deg,#0d0d20,#070718)', border: '1px solid #00ff8822' }}>
         <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
           <div>
@@ -56,7 +55,7 @@ export default function HomeTab({
               DAY {dayNumber} <span style={{ color: '#fff' }}>OF {FORWARD_TEST_DAYS}</span>
             </div>
             <div style={{ fontSize: 10, fontFamily: 'monospace', marginTop: 4, color: '#555' }}>
-              Forward test · {FORWARD_TEST_DAYS - dayNumber} days remaining · Strategy v{strategyVersion}
+              Auto-scanning every 4h · {FORWARD_TEST_DAYS - dayNumber} days remaining · Strategy v{strategyVersion}
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -68,23 +67,15 @@ export default function HomeTab({
             </div>
           </div>
         </div>
-
-        {/* Progress bar */}
         <div style={{ height: 6, background: '#1a1a2e', borderRadius: 999, marginBottom: 8 }}>
-          <div style={{
-            height: 6, borderRadius: 999,
-            width: `${Math.min(100, (dayNumber / FORWARD_TEST_DAYS) * 100)}%`,
-            background: 'linear-gradient(90deg,#00ff88,#00aaff)'
-          }} />
+          <div style={{ height: 6, borderRadius: 999, width: `${Math.min(100, (dayNumber / FORWARD_TEST_DAYS) * 100)}%`, background: 'linear-gradient(90deg,#00ff88,#00aaff)' }} />
         </div>
-
-        {/* Equity curve */}
         <EquityChart curve={equityCurve} height={70} />
       </div>
 
       {/* 6 stats */}
       <div className="grid grid-cols-6 gap-2">
-        <StatBox label="Signals" value={trades.length} sub="logged" color="#00aaff" />
+        <StatBox label="Signals" value={signalCount} sub="auto-logged" color="#00aaff" />
         <StatBox label="Closed" value={closedCount} sub="trades" color="#ffcc00" />
         <StatBox label="Win rate" value={`${winRate}%`} sub={`${wins}/${closedCount}`} color={winRate >= 50 ? '#00ff88' : '#ff3355'} />
         <StatBox label="Profit factor" value={pf} sub={pf >= 1.5 ? 'good' : 'building'} color={pf >= 1.5 ? '#00ff88' : '#ffcc00'} />
@@ -92,7 +83,7 @@ export default function HomeTab({
         <StatBox label="Avg loss" value={`-$${Math.round(Math.abs(avgLoss))}`} sub="per trade" color="#ff3355" />
       </div>
 
-      {/* Strategy auto-improve alert */}
+      {/* Strategy auto-improve */}
       {strategyChanges.length > 0 && (
         <Card border="#00aaff22">
           <SectionHeader title={`⚡ STRATEGY AUTO-IMPROVED · VERSION ${strategyVersion}`} color="#00aaff" />
@@ -106,11 +97,27 @@ export default function HomeTab({
         </Card>
       )}
 
-      {/* Breakdown grid */}
+      {/* Market status */}
+      <Card border="#ffcc0022">
+        <SectionHeader title="MARKET STATUS — AUTO-SCAN ACTIVE" color="#ffcc00" />
+        <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#ffcc00', marginBottom: 4 }}>
+          ⚡ Background scan runs every 4 hours automatically
+        </div>
+        <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#555' }}>
+          {signalCount} total signals logged since start · Signals appear in Scan tab automatically
+        </div>
+        {openCount > 0 && (
+          <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#00aaff', marginTop: 4 }}>
+            {openCount} open trade{openCount > 1 ? 's' : ''} — price tracker monitoring hourly
+          </div>
+        )}
+      </Card>
+
+      {/* Breakdown */}
       <div className="grid grid-cols-2 gap-3">
         <Card>
           <SectionHeader title="WIN RATE BY COIN" />
-          {coinStats.length === 0 && <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#333' }}>No closed trades yet</div>}
+          {coinStats.length === 0 && <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#333' }}>No closed trades yet — waiting for market recovery</div>}
           {coinStats.map(({ coin, wr, trades: n, wins: w }) => {
             const col = wr === null ? '#333' : wr >= 60 ? '#00ff88' : wr >= 40 ? '#ffcc00' : '#ff3355'
             return (
@@ -124,7 +131,6 @@ export default function HomeTab({
             )
           })}
         </Card>
-
         <Card>
           <SectionHeader title="WIN RATE BY ENTRY TYPE" />
           {entryStats.map(({ type, wr, n, w }) => {
@@ -135,29 +141,8 @@ export default function HomeTab({
               </div>
             )
           })}
-          {entryStats.filter(e => e.n >= 2).length >= 2 && (() => {
-            const fvg = entryStats.find(e => e.type === 'FVG')
-            const bo  = entryStats.find(e => e.type === 'BREAKOUT')
-            const diff = fvg && bo ? fvg.wr - bo.wr : 0
-            if (diff > 10) return (
-              <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 6, background: '#00ff8808', border: '1px solid #00ff8818', fontSize: 10, fontFamily: 'monospace', color: '#00ff8877' }}>
-                FVG outperforming breakout by {diff}pp
-              </div>
-            )
-            return null
-          })()}
         </Card>
       </div>
-
-      {/* Open trades */}
-      {openCount > 0 && (
-        <Card border="#00aaff22">
-          <SectionHeader title="OPEN TRADES NOW" color="#00aaff" />
-          <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#00aaff77' }}>
-            {openCount} trade{openCount > 1 ? 's' : ''} active — go to Trade History to manage
-          </div>
-        </Card>
-      )}
     </div>
   )
 }
