@@ -166,6 +166,7 @@ export default function App() {
             strategyChanges={ft.liveParams?.changes || []}
             openCount={ft.open.length}
             capital={settings.wallet}
+            signalCount={ft.signalCount}
             trades={ft.trades}
           />
         )}
