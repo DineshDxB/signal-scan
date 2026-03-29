@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Trade, CoinProfile, LiveStrategyParams, GhostTrade } from '../types'
-import { getAllTrades, getCoinProfiles, getForwardTestStartDate, initForwardTest, getGhostTrades } from '../lib/db'
+import { getAllTrades, getCoinProfiles, getForwardTestStartDate, initForwardTest, getGhostTrades, getSignalLog } from '../lib/db'
 import { computeLiveParams, computeCoinProfile } from '../lib/strategy'
 import { FORWARD_TEST_DAYS } from '../config'
 
@@ -10,6 +10,7 @@ interface ForwardTestState {
   totalDays: number
   startDate: string | null
   trades: Trade[]
+  signalCount: number
   coinProfiles: Record<string, CoinProfile>
   liveParams: LiveStrategyParams | null
   ghostTrades: GhostTrade[]
@@ -25,36 +26,32 @@ const BASE_PARAMS_FALLBACK = {
 export function useForwardTest(initialCapital: number) {
   const [state, setState] = useState<ForwardTestState>({
     loading: true, dayNumber: 0, totalDays: FORWARD_TEST_DAYS,
-    startDate: null, trades: [], coinProfiles: {}, liveParams: null,
+    startDate: null, trades: [], signalCount: 0, coinProfiles: {}, liveParams: null,
     ghostTrades: [], equityCurve: [initialCapital], isComplete: false
   })
 
   const refresh = useCallback(async () => {
     setState(s => ({ ...s, loading: true }))
     try {
-      const [trades, coinProfilesArr, startDate, ghostTrades] = await Promise.all([
+      const [trades, coinProfilesArr, startDate, ghostTrades, signalLog] = await Promise.all([
         getAllTrades(),
         getCoinProfiles(),
         getForwardTestStartDate(),
-        getGhostTrades()
+        getGhostTrades(),
+        getSignalLog(60)
       ])
 
       // Init forward test if not started
       if (!startDate) await initForwardTest()
 
       const start   = startDate ? new Date(startDate) : new Date()
-      const dayNum  = Math.floor((Date.now() - start.getTime()) / 86400000)
+      const dayNum  = Math.max(0, Math.floor((Date.now() - start.getTime()) / 86400000))
       const isComplete = dayNum >= FORWARD_TEST_DAYS
 
-      // Compute live strategy params from all trade data
       const liveParams = computeLiveParams(trades)
 
-      // Compute per-coin profiles
       const profiles: Record<string, CoinProfile> = {}
-      for (const ap of coinProfilesArr) {
-        profiles[ap.coin] = ap
-      }
-      // Also compute from raw trade data for coins without saved profile
+      for (const ap of coinProfilesArr) profiles[ap.coin] = ap
       const coins = [...new Set(trades.map(t => t.coin))]
       for (const coin of coins) {
         if (!profiles[coin]) {
@@ -63,20 +60,24 @@ export function useForwardTest(initialCapital: number) {
         }
       }
 
-      // Build equity curve
       const closed  = trades.filter(t => t.outcome !== 'OPEN' && t.pnl != null)
         .sort((a, b) => new Date(a.openedAt).getTime() - new Date(b.openedAt).getTime())
       let eq = initialCapital
       const curve = [initialCapital]
-      for (const t of closed) {
-        eq += t.pnl || 0
-        curve.push(eq)
-      }
+      for (const t of closed) { eq += t.pnl || 0; curve.push(eq) }
 
       setState({
-        loading: false, dayNumber: dayNum, totalDays: FORWARD_TEST_DAYS,
-        startDate: start.toISOString(), trades, coinProfiles: profiles,
-        liveParams, ghostTrades, equityCurve: curve, isComplete
+        loading: false,
+        dayNumber: dayNum,
+        totalDays: FORWARD_TEST_DAYS,
+        startDate: start.toISOString(),
+        trades,
+        signalCount: signalLog.length,  // count ALL logged signals including WAIT
+        coinProfiles: profiles,
+        liveParams,
+        ghostTrades,
+        equityCurve: curve,
+        isComplete
       })
     } catch (err) {
       console.error('useForwardTest:', err)
@@ -86,7 +87,6 @@ export function useForwardTest(initialCapital: number) {
 
   useEffect(() => { refresh() }, [refresh])
 
-  // Computed stats
   const trades   = state.trades
   const closed   = trades.filter(t => t.outcome !== 'OPEN')
   const wins     = closed.filter(t => t.outcome?.startsWith('TP'))
@@ -100,9 +100,5 @@ export function useForwardTest(initialCapital: number) {
     ? parseFloat((Math.abs(wins.reduce((s,t)=>s+(t.pnl||0),0)) / Math.abs(losses.reduce((s,t)=>s+(t.pnl||0),0))).toFixed(2))
     : wins.length > 0 ? 99 : 0
 
-  return {
-    ...state, refresh,
-    closed, wins, losses, open,
-    totalPnl, winRate, avgWin, avgLoss, pf
-  }
+  return { ...state, refresh, closed, wins, losses, open, totalPnl, winRate, avgWin, avgLoss, pf }
 }
