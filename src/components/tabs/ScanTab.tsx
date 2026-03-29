@@ -24,33 +24,39 @@ export default function ScanTab({
   return (
     <div style={{ padding: 16 }}>
       {/* Scan button */}
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div>
-          <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#555' }}>
-            {lastScanTime
-              ? `Last scan: ${new Date(lastScanTime).toLocaleTimeString('en-AE', { timeZone: 'Asia/Dubai' })} GST`
-              : 'No scan yet today'}
-          </div>
-          {openTradeCount > 0 && (
-            <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#00aaff' }}>
-              {openTradeCount} open trade{openTradeCount > 1 ? 's' : ''} active
+      {/* Auto-scan status banner */}
+      <div style={{ padding: '10px 14px', borderRadius: 8, marginBottom: 12, background: '#0a0a1a', border: '1px solid #00ff8818' }}>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#00ff88', marginBottom: 2 }}>
+              ⚡ AUTO-SCAN RUNNING — every 4 hours automatically
             </div>
-          )}
+            <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#555' }}>
+              {lastScanTime
+                ? `Last scan: ${new Date(lastScanTime).toLocaleTimeString('en-AE', { timeZone: 'Asia/Dubai' })} GST · Results load automatically`
+                : 'Waiting for first auto-scan · Next scan at top of 4-hour window'}
+            </div>
+            {openTradeCount > 0 && (
+              <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#00aaff', marginTop: 2 }}>
+                {openTradeCount} open trade{openTradeCount > 1 ? 's' : ''} active — price-tracker monitoring hourly
+              </div>
+            )}
+          </div>
+          <button
+            onClick={onScan}
+            disabled={scanning}
+            style={{
+              padding: '8px 18px', fontFamily: 'monospace', fontSize: 11, fontWeight: 700,
+              letterSpacing: 1, cursor: scanning ? 'not-allowed' : 'pointer',
+              background: scanning ? '#1a1a2e' : 'transparent',
+              border: `1px solid ${scanning ? '#333' : '#ffffff22'}`,
+              borderRadius: 6, color: scanning ? '#555' : '#555',
+              transition: 'all 0.2s'
+            }}
+          >
+            {scanning ? 'SCANNING...' : 'Manual scan'}
+          </button>
         </div>
-        <button
-          onClick={onScan}
-          disabled={scanning}
-          style={{
-            padding: '10px 24px', fontFamily: 'monospace', fontSize: 12, fontWeight: 700,
-            letterSpacing: 2, cursor: scanning ? 'not-allowed' : 'pointer',
-            background: scanning ? '#1a1a2e' : '#00ff8822',
-            border: `1.5px solid ${scanning ? '#333' : '#00ff88'}`,
-            borderRadius: 8, color: scanning ? '#555' : '#00ff88',
-            transition: 'all 0.2s'
-          }}
-        >
-          {scanning ? 'SCANNING...' : '▶ RUN SCAN'}
-        </button>
       </div>
 
       {/* Scan progress */}
