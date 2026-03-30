@@ -70,7 +70,7 @@ export default function ScanTab({
   useEffect(() => {
     async function loadFromDB() {
       try {
-        const rows = await getSignalLog(1)
+        const rows = await getSignalLog(7)
         if (rows.length > 0) {
           const latest = new Date(rows[0].signal_time || rows[0].created_at)
           const cutoff = new Date(latest.getTime() - 30 * 60000)
