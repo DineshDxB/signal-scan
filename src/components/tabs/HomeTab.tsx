@@ -20,7 +20,8 @@ const LAYERS = [
     checks:['R/R above 1:3','Fear & Greed 35–75','Funding neutral','No crash 3d'] },
 ]
 
-// Estimate layer scores from DB row when layer_scores saved as {}
+// Calculate layer scores ALWAYS from stored indicators — never trust saved scores
+// This gives accurate, meaningful scores even for old scan data
 function estimateScores(row: Record<string,unknown>) {
   const rsi    = Number(row.rsi_at_entry || 50)
   const vol    = Number(row.volume_ratio || 1)
@@ -32,29 +33,64 @@ function estimateScores(row: Record<string,unknown>) {
   const tp3    = Number(row.tp3 || price * 1.26)
   const rr     = price > 0 ? (tp3 - price) / (price - sl) : 0
 
-  // Try real saved scores first
-  let ls: Record<string,number> = {}
-  try {
-    const raw = row.layer_scores
-    if (typeof raw === 'string' && raw.length > 2) ls = JSON.parse(raw)
-    else if (raw && typeof raw === 'object') ls = raw as Record<string,number>
-  } catch { /**/ }
-
-  if ((ls.stage||0) + (ls.trend||0) + (ls.setup||0) + (ls.momentum||0) + (ls.risk||0) > 0) {
-    return { stage:Math.round(ls.stage||0), trend:Math.round(ls.trend||0), setup:Math.round(ls.setup||0), momentum:Math.round(ls.momentum||0), risk:Math.round(ls.risk||0) }
-  }
-
-  // Estimate from stored indicators
   const isSell = signal === 'SELL'
   const isBuy  = signal === 'BUY'
+  const isBear = regime === 'trending_bear' || (!isBuy && !isSell && regime !== 'trending_bull')
 
-  const stageScore    = isBuy ? 75 : isSell ? 85 : (regime==='trending_bull'?40:10)
-  const trendScore    = adx>=25 ? 80 : adx>=18 ? 60 : adx>=12 ? 35 : 15
-  const setupScore    = isBuy ? (rsi>=50&&rsi<=68?80:rsi>68?25:50) : isSell ? (rsi<40?80:rsi<50?65:45) : (rsi>=50&&rsi<=68?55:rsi<50?35:20)
-  const momentumScore = vol>=2.0?80 : vol>=1.8?65 : vol>=1.3?40 : 20
-  const riskScore     = rr>=3?75 : rr>=2?50 : 25
+  // Layer 1 — Stage Analysis (30%)
+  // SELL = confirmed Stage 4. BUY = confirmed Stage 2. WAIT = below 30W MA (Stage 4)
+  let stageScore: number
+  if (isBuy)       stageScore = 75
+  else if (isSell) stageScore = 85  // Stage 4 confirmed = high score for SELL context
+  else             stageScore = 10  // WAIT = below 30W MA, hard fail
 
-  return { stage:stageScore, trend:trendScore, setup:setupScore, momentum:momentumScore, risk:riskScore }
+  // Layer 2 — Multi-TF Trend (25%)
+  // ADX tells us trend strength regardless of direction
+  let trendScore: number
+  if (adx >= 30)      trendScore = 85
+  else if (adx >= 22) trendScore = 65
+  else if (adx >= 15) trendScore = 40
+  else                trendScore = 20
+  // Penalty if bearish (for BUY context)
+  if (!isSell && isBear) trendScore = Math.round(trendScore * 0.4)
+
+  // Layer 3 — Setup Quality (20%)
+  // RSI tells us entry timing quality
+  let setupScore: number
+  if (isBuy) {
+    setupScore = (rsi>=50&&rsi<=68) ? 80 : rsi>68 ? 20 : rsi>=45 ? 50 : 30
+  } else if (isSell) {
+    setupScore = rsi<35 ? 85 : rsi<45 ? 70 : rsi<55 ? 55 : 40
+  } else {
+    // WAIT — RSI outside zone is why we wait
+    setupScore = (rsi>=50&&rsi<=68) ? 50 : rsi>68 ? 15 : rsi>=45 ? 35 : 25
+  }
+
+  // Layer 4 — Momentum (15%)
+  // Volume ratio is the key indicator
+  let momentumScore: number
+  if (vol >= 2.5)      momentumScore = 90
+  else if (vol >= 2.0) momentumScore = 80
+  else if (vol >= 1.8) momentumScore = 65
+  else if (vol >= 1.3) momentumScore = 45
+  else if (vol >= 1.0) momentumScore = 25
+  else                 momentumScore = 15
+
+  // Layer 5 — Risk Gate (10%)
+  // R/R ratio determines this
+  let riskScore: number
+  if (rr >= 4)      riskScore = 90
+  else if (rr >= 3) riskScore = 75
+  else if (rr >= 2) riskScore = 50
+  else              riskScore = 20
+
+  return {
+    stage:    Math.round(stageScore),
+    trend:    Math.round(trendScore),
+    setup:    Math.round(setupScore),
+    momentum: Math.round(momentumScore),
+    risk:     Math.round(riskScore),
+  }
 }
 
 // Check if scores changed significantly since last scan
