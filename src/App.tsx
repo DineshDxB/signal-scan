@@ -4,6 +4,7 @@ import { getSettings, saveSettings, initForwardTest } from './lib/db'
 import { useForwardTest } from './hooks/useForwardTest'
 
 import HomeTab         from './components/tabs/HomeTab'
+import VerifyTab       from './components/tabs/VerifyTab'
 import TradeHistoryTab from './components/tabs/TradeHistoryTab'
 import StrategyTab     from './components/tabs/StrategyTab'
 import ReportTab       from './components/tabs/ReportTab'
@@ -18,6 +19,7 @@ const TABS = [
   { id:'history',  label:'📋 History' },
   { id:'strategy', label:'⚡ Strategy' },
   { id:'report',   label:'📊 Report' },
+  { id:'verify',   label:'🔬 Verify' },
 ]
 
 export default function App() {
@@ -127,6 +129,7 @@ export default function App() {
         )}
         {tab==='history'  && <TradeHistoryTab/>}
         {tab==='strategy' && <StrategyTab liveParams={ft.liveParams} trades={ft.trades} coinProfiles={ft.coinProfiles}/>}
+        {tab==='verify'  && <VerifyTab/>}
         {tab==='report'   && <ReportTab dayNumber={ft.dayNumber} trades={ft.trades} ghostTrades={ft.ghostTrades} liveParams={ft.liveParams} totalPnl={ft.totalPnl} winRate={ft.winRate} pf={ft.pf} capital={settings.wallet}/>}
       </div>
     </div>
